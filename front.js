@@ -70,6 +70,10 @@ function screenRegister() {
         <input id="f_cod" placeholder="Ex.: AB30072010" style="text-transform:uppercase">
         <small>Combinem um código entre vocês e usem o mesmo nos dois questionários. É com ele que pareamos as respostas do casal.</small>
       </label>
+      <label>Código de convite da turma <span class="req">obrigatório</span>
+        <input id="f_invite" placeholder="Ex.: JORNADA-XXXXX" style="text-transform:uppercase">
+        <small>O código é fornecido pela equipe da Jornada à sua turma.</small>
+      </label>
       <div class="consent">
         <label class="check"><input type="checkbox" id="f_consent">
           <span>Autorizo a plataforma a acessar e tratar minhas respostas e o relatório gerado, conforme a finalidade da Jornada Extraordinária e a LGPD. Sei que sem esta autorização não é possível gerar as informações.</span>
@@ -85,12 +89,14 @@ async function doRegister() {
   const genero = document.getElementById("f_genero").value;
   const conjuge_nome = document.getElementById("f_conj").value.trim();
   const codigo_casal = document.getElementById("f_cod").value.trim();
+  const invite_code = document.getElementById("f_invite").value.trim();
   const consent = document.getElementById("f_consent").checked;
   const err = document.getElementById("reg_err");
   if (!nome || !genero || !codigo_casal) { err.textContent = "Preencha nome, gênero e código do casal."; return; }
+  if (!invite_code) { err.textContent = "Informe o código de convite da sua turma."; return; }
   if (!consent) { err.textContent = "Sem a autorização não é possível gerar as informações necessárias."; return; }
   err.textContent = "Enviando...";
-  const { data } = await api("register", { nome, genero, conjuge_nome, codigo_casal, consent });
+  const { data } = await api("register", { nome, genero, conjuge_nome, codigo_casal, consent, invite_code });
   if (!data.ok) { err.textContent = mapErr(data); return; }
   access_code = data.access_code; saveCode(access_code);
   screenCode(access_code);
@@ -262,7 +268,10 @@ function mapErr(d) {
     consentimento_necessario: "Sem a autorização não é possível gerar as informações.",
     ja_respondido: "Este questionário já foi respondido e não pode ser alterado.",
     codigo_invalido: "Código não encontrado.",
-    respostas_incompletas: "Há questões não respondidas."
+    respostas_incompletas: "Há questões não respondidas.",
+    convite_necessario: "Informe o código de convite da sua turma.",
+    convite_invalido: "Código de convite inválido ou inativo.",
+    muitas_tentativas: "Muitas tentativas. Aguarde alguns minutos e tente de novo."
   };
   return m[d.error] || d.message || "Não foi possível concluir. Tente novamente.";
 }

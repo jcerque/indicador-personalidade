@@ -46,6 +46,7 @@
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ADMIN_URL = CONFIG.FN_URL.replace("respondent-api","admin-api");
+const COHORTS_URL = CONFIG.FN_URL.replace("respondent-api","cohorts-api");
 const sb = createClient(CONFIG.FN_URL.split("/functions")[0], CONFIG.ANON_KEY, { auth: { persistSession:true, detectSessionInUrl:true, flowType:"pkce" } });
 const app = () => document.getElementById("app");
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -55,6 +56,14 @@ async function adminCall(action, payload={}){
   const { data:{ session } } = await sb.auth.getSession();
   if(!session) throw new Error("sem_sessao");
   const res = await fetch(ADMIN_URL, { method:"POST",
+    headers:{ "Content-Type":"application/json", "apikey":CONFIG.ANON_KEY, "Authorization":"Bearer "+session.access_token },
+    body: JSON.stringify({ action, ...payload }) });
+  return res.json();
+}
+async function cohortCall(action, payload={}){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session) throw new Error("sem_sessao");
+  const res = await fetch(COHORTS_URL, { method:"POST",
     headers:{ "Content-Type":"application/json", "apikey":CONFIG.ANON_KEY, "Authorization":"Bearer "+session.access_token },
     body: JSON.stringify({ action, ...payload }) });
   return res.json();
@@ -153,6 +162,7 @@ async function render(){
       <div class="tab ${TAB==='lista'?'active':''}" data-t="lista">Respondentes</div>
       <div class="tab ${TAB==='casais'?'active':''}" data-t="casais">Casais</div>
       <div class="tab ${TAB==='emparelhar'?'active':''}" data-t="emparelhar">Emparelhamento</div>
+      <div class="tab ${TAB==='turmas'?'active':''}" data-t="turmas">Turmas</div>
       <div class="tab ${TAB==='auditoria'?'active':''}" data-t="auditoria">Auditoria</div>
     </div>
     <div id="panel"><div class="card">Carregando...</div></div>`);
@@ -162,6 +172,7 @@ async function render(){
   if(TAB==="lista") panelList();
   else if(TAB==="casais") panelCouples();
   else if(TAB==="emparelhar") panelPair();
+  else if(TAB==="turmas") panelCohorts();
   else if(TAB==="auditoria") panelAudit();
 }
 function statusBadge(s){ const m={gerado:"b-gerado",em_revisao:"b-gerado",revisado:"b-revisado",enviado:"b-enviado"}; return s?`<span class="badge ${m[s]||'b-none'}">${esc(s)}</span>`:`<span class="badge b-none">—</span>`; }
@@ -271,6 +282,33 @@ async function panelPair(){
     document.getElementById("pm").className=s.ok?"ok":"err";
     document.getElementById("pm").textContent=s.ok?"Emparelhamento salvo.":(s.message||s.error);
   };
+}
+async function panelCohorts(){
+  const r = await cohortCall("list");
+  const rows = (r.cohorts||[]).map(c=>`<tr>
+    <td>${esc(c.nome)}</td>
+    <td><span class="chip">${esc(c.invite_code)}</span></td>
+    <td>${c.respondentes}</td>
+    <td>${c.ativo?'<span class="badge b-enviado">ativa</span>':'<span class="badge b-none">inativa</span>'}</td>
+    <td><button class="btn sm ghost" data-cid="${c.id}" data-act="${c.ativo?'off':'on'}">${c.ativo?'Desativar':'Ativar'}</button></td></tr>`).join("");
+  document.getElementById("panel").innerHTML = `<div class="card">
+    <h2>Turmas e códigos de convite</h2>
+    <p class="muted small">Cada turma tem um código que os participantes informam no cadastro. Desative para encerrar novos cadastros de uma turma.</p>
+    <label>Nome da nova turma<input id="newcohort" placeholder="Ex.: Turma Março 2026"></label>
+    <div id="cohort_err" class="err"></div>
+    <button class="btn primary sm" id="addcohort">Criar turma</button>
+    <table class="data" style="margin-top:14px"><thead><tr><th>Turma</th><th>Código de convite</th><th>Respondentes</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan=5 class="muted">Nenhuma turma.</td></tr>'}</tbody></table></div>`;
+  document.getElementById("addcohort").onclick = async ()=>{
+    const nome=document.getElementById("newcohort").value.trim();
+    if(!nome){ document.getElementById("cohort_err").textContent="Informe o nome da turma."; return; }
+    const g=await cohortCall("create",{nome});
+    if(!g.ok){ document.getElementById("cohort_err").textContent=g.detail||g.error; return; }
+    panelCohorts();
+  };
+  document.querySelectorAll("[data-cid]").forEach(b=>b.onclick=async()=>{
+    await cohortCall("toggle",{id:b.dataset.cid, ativo:b.dataset.act==='on'}); panelCohorts();
+  });
 }
 async function panelAudit(){
   const r = await adminCall("audit");
