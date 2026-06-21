@@ -242,7 +242,15 @@ async function renderCouple(code){
   const col=(x)=>{ const res=x.result; const ax=res?.axes||{};
     const bars=["EI","SN","TF","JP"].map(k=>{const z=ax[k]; if(!z)return""; return `<div class="kv"><span>${z.winner}</span><b>${z.winCount}</b></div>`}).join("");
     return `<div><h3>${esc(x.respondent.nome)} ${res?`<span class="chip">${esc(res.tipo)}</span>`:''}</h3>${bars}</div>`; };
-  el.innerHTML = `<div class="grid2">${col(a)}${col(b)}</div>`;
+  const ambos = a.result && b.result;
+  el.innerHTML = `<div class="grid2">${col(a)}${col(b)}</div>`+
+    (ambos?`<div style="margin-top:10px"><button class="btn gold sm" data-couple="${esc(code)}">Gerar relatório do casal</button></div>`
+          :`<p class="small muted" style="margin-top:8px">O relatório do casal fica disponível quando os dois concluírem.</p>`);
+  const btn = el.querySelector("[data-couple]");
+  if(btn) btn.onclick = async ()=>{ btn.textContent="Gerando..."; const g=await adminCall("generate_couple",{codigo:code});
+    btn.textContent="Gerar relatório do casal";
+    if(!g.ok){ alert(g.message||g.error); return; }
+    const w=window.open("","_blank"); w.document.write(g.html); w.document.close(); };
 }
 async function panelPair(){
   const r = await adminCall("list");
