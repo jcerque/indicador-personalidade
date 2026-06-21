@@ -23,6 +23,17 @@ const clearCode = () => { try { localStorage.removeItem("ip_code"); } catch {} }
 
 let answers = {};
 let access_code = "";
+let validatedInvite = "";
+let validatedCohort = "";
+
+async function apiInvite(invite_code) {
+  const res = await fetch(CONFIG.FN_URL.replace("respondent-api", "validate-invite"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": CONFIG.ANON_KEY, "Authorization": "Bearer " + CONFIG.ANON_KEY },
+    body: JSON.stringify({ invite_code })
+  });
+  try { return await res.json(); } catch { return { error: "resposta_invalida" }; }
+}
 
 /* ---------- Boas-vindas ---------- */
 function screenWelcome() {
@@ -34,7 +45,7 @@ function screenWelcome() {
       <p class="sub">Baseado no Myers-Briggs Type Indicator</p>
       <p>Suas respostas ajudam a entender como você prefere ver as coisas e tomar decisões. Não há respostas certas ou erradas. Conhecer suas preferências e as do seu cônjuge ajuda a entender pontos fortes e como vocês se complementam.</p>
       <p class="muted">São 93 questões rápidas, em 4 partes. Menos de 10 minutos.</p>
-      <button class="btn primary" onclick="screenRegister()">Começar</button>
+      <button class="btn primary" onclick="screenInviteGate()">Começar</button>
       <button class="btn ghost" onclick="screenLogin()">Já tenho um código de acesso</button>
       ${saved ? `<p class="muted small">Encontramos um código salvo neste dispositivo. <a href="#" onclick="resumeSaved();return false">Retomar</a></p>` : ""}
     </section>`);
@@ -45,8 +56,37 @@ async function resumeSaved() {
   if (data.ok) { access_code = code; routeAfterLogin(data); } else { clearCode(); screenWelcome(); }
 }
 
+/* ---------- Portão de convite (turma) ---------- */
+function screenInviteGate() {
+  show(`
+    <section class="card">
+      <div class="brand">Acesso por turma</div>
+      <h2>Código de convite</h2>
+      <p>Informe o código de convite fornecido pela equipe da Jornada à sua turma. Ele é necessário para iniciar o questionário.</p>
+      <label>Código de convite
+        <input id="g_invite" placeholder="Ex.: JORNADA-XXXXX" style="text-transform:uppercase">
+      </label>
+      <div id="gate_err" class="err"></div>
+      <button class="btn primary" onclick="checkInvite()">Continuar</button>
+      <button class="btn ghost" onclick="screenWelcome()">Voltar</button>
+    </section>`);
+}
+async function checkInvite() {
+  const code = document.getElementById("g_invite").value.trim();
+  const err = document.getElementById("gate_err");
+  if (!code) { err.textContent = "Informe o código de convite."; return; }
+  err.textContent = "Verificando...";
+  const data = await apiInvite(code);
+  if (data.error === "muitas_tentativas") { err.textContent = "Muitas tentativas. Aguarde alguns minutos."; return; }
+  if (!data.valid) { err.textContent = "Código de convite inválido ou inativo. Confira com a equipe da Jornada."; return; }
+  validatedInvite = code.toUpperCase();
+  validatedCohort = data.cohort_nome || "";
+  screenRegister();
+}
+
 /* ---------- Cadastro (gênero + consentimento obrigatórios) ---------- */
 function screenRegister() {
+  if (!validatedInvite) { screenInviteGate(); return; }
   show(`
     <section class="card">
       <h2>Seus dados</h2>
@@ -70,10 +110,7 @@ function screenRegister() {
         <input id="f_cod" placeholder="Ex.: AB30072010" style="text-transform:uppercase">
         <small>Combinem um código entre vocês e usem o mesmo nos dois questionários. É com ele que pareamos as respostas do casal.</small>
       </label>
-      <label>Código de convite da turma <span class="req">obrigatório</span>
-        <input id="f_invite" placeholder="Ex.: JORNADA-XXXXX" style="text-transform:uppercase">
-        <small>O código é fornecido pela equipe da Jornada à sua turma.</small>
-      </label>
+      <div class="invite-ok">Turma confirmada${validatedCohort ? ": " + esc(validatedCohort) : ""} <span class="muted">(convite ${esc(validatedInvite)})</span></div>
       <div class="consent">
         <label class="check"><input type="checkbox" id="f_consent">
           <span>Autorizo a plataforma a acessar e tratar minhas respostas e o relatório gerado, conforme a finalidade da Jornada Extraordinária e a LGPD. Sei que sem esta autorização não é possível gerar as informações.</span>
@@ -89,11 +126,11 @@ async function doRegister() {
   const genero = document.getElementById("f_genero").value;
   const conjuge_nome = document.getElementById("f_conj").value.trim();
   const codigo_casal = document.getElementById("f_cod").value.trim();
-  const invite_code = document.getElementById("f_invite").value.trim();
+  const invite_code = validatedInvite;
   const consent = document.getElementById("f_consent").checked;
   const err = document.getElementById("reg_err");
   if (!nome || !genero || !codigo_casal) { err.textContent = "Preencha nome, gênero e código do casal."; return; }
-  if (!invite_code) { err.textContent = "Informe o código de convite da sua turma."; return; }
+  if (!invite_code) { screenInviteGate(); return; }
   if (!consent) { err.textContent = "Sem a autorização não é possível gerar as informações necessárias."; return; }
   err.textContent = "Enviando...";
   const { data } = await api("register", { nome, genero, conjuge_nome, codigo_casal, consent, invite_code });
