@@ -18,10 +18,8 @@
   .btn{border:1px solid transparent;border-radius:9px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;margin:6px 6px 0 0}
   .btn.primary{background:var(--navy);color:#fff} .btn.primary:hover{background:var(--navy2)}
   .btn.ghost{background:transparent;color:var(--navy);border:1px solid var(--line)}
-  .btn.sm{padding:6px 11px;font-size:12.5px}
-  .btn.gold{background:var(--gold);color:#fff}
-  .err{color:var(--warn);font-size:13px;min-height:16px;margin:6px 0}
-  .ok{color:var(--ok);font-size:13px}
+  .btn.sm{padding:6px 11px;font-size:12.5px} .btn.gold{background:var(--gold);color:#fff}
+  .err{color:var(--warn);font-size:13px;min-height:16px;margin:6px 0} .ok{color:var(--ok);font-size:13px}
   .muted{color:var(--muted)} .small{font-size:12.5px}
   table.data{width:100%;border-collapse:collapse;font-size:13.5px}
   table.data th,table.data td{border-bottom:1px solid var(--line);padding:8px 8px;text-align:left}
@@ -43,121 +41,65 @@
 <body>
 <main id="app"><div class="card">Carregando...</div></main>
 <script src="config.js"></script>
-<script type="module">
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+<script>
+"use strict";
 const ADMIN_URL = CONFIG.FN_URL.replace("respondent-api","admin-api");
 const COHORTS_URL = CONFIG.FN_URL.replace("respondent-api","cohorts-api");
-const sb = createClient(CONFIG.FN_URL.split("/functions")[0], CONFIG.ANON_KEY, { auth: { persistSession:true, detectSessionInUrl:true, flowType:"pkce" } });
+let ADMIN_KEY = ""; try { ADMIN_KEY = localStorage.getItem("ip_admin_key") || ""; } catch {}
 const app = () => document.getElementById("app");
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function show(h){ app().innerHTML = h; }
 
 async function adminCall(action, payload={}){
-  const { data:{ session } } = await sb.auth.getSession();
-  if(!session) throw new Error("sem_sessao");
   const res = await fetch(ADMIN_URL, { method:"POST",
-    headers:{ "Content-Type":"application/json", "apikey":CONFIG.ANON_KEY, "Authorization":"Bearer "+session.access_token },
+    headers:{ "Content-Type":"application/json", "x-admin-key":ADMIN_KEY },
     body: JSON.stringify({ action, ...payload }) });
   return res.json();
 }
 async function cohortCall(action, payload={}){
-  const { data:{ session } } = await sb.auth.getSession();
-  if(!session) throw new Error("sem_sessao");
   const res = await fetch(COHORTS_URL, { method:"POST",
-    headers:{ "Content-Type":"application/json", "apikey":CONFIG.ANON_KEY, "Authorization":"Bearer "+session.access_token },
+    headers:{ "Content-Type":"application/json", "x-admin-key":ADMIN_KEY },
     body: JSON.stringify({ action, ...payload }) });
   return res.json();
 }
 
-/* ---------- Login ---------- */
+/* ---------- Login por chave ---------- */
 function loginScreen(msg=""){
-  show(`<div class="card" style="max-width:440px;margin:8vh auto">
+  show(`<div class="card" style="max-width:460px;margin:8vh auto">
     <div class="brand">Jornada Extraordinária</div>
     <h1>Painel do administrador</h1>
-    <p class="muted small">Acesso restrito. Informe seu e-mail autorizado para receber um link de acesso.</p>
-    <label>E-mail <input id="email" type="email" placeholder="voce@dominio.com"></label>
+    <p class="muted small">Acesso restrito. Informe sua chave de administrador.</p>
+    <label>Chave de administrador <input id="key" type="password" placeholder="JADM-XXXXX-XXXXX-XXXXX" autocomplete="off"></label>
     <div id="msg" class="err">${esc(msg)}</div>
-    <button class="btn primary" id="send">Receber link de acesso</button>
+    <button class="btn primary" id="enter">Entrar</button>
   </div>`);
-  document.getElementById("send").onclick = async ()=>{
-    const email = document.getElementById("email").value.trim();
-    if(!email){ document.getElementById("msg").textContent="Informe o e-mail."; return; }
-    document.getElementById("msg").textContent="Enviando...";
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split("#")[0] } });
-    document.getElementById("msg").className = error?"err":"ok";
-    document.getElementById("msg").textContent = error ? error.message : "Link enviado. Abra seu e-mail e clique para entrar (verifique o spam).";
-  };
+  document.getElementById("enter").onclick = doLogin;
+  document.getElementById("key").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
 }
-
-/* ---------- MFA ---------- */
-async function ensureMfa(){
-  const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
-  if(aal && aal.currentLevel !== aal.nextLevel && aal.nextLevel === "aal2"){
-    return mfaChallenge();
-  }
-  return true;
-}
-function mfaChallenge(){
-  return new Promise(async (resolve)=>{
-    const { data } = await sb.auth.mfa.listFactors();
-    const factor = (data?.totp||[])[0];
-    show(`<div class="card" style="max-width:440px;margin:8vh auto"><h2>Segundo fator</h2>
-      <p class="muted small">Informe o código do seu aplicativo autenticador.</p>
-      <label>Código (6 dígitos)<input id="code" inputmode="numeric" placeholder="000000"></label>
-      <div id="m" class="err"></div><button class="btn primary" id="v">Verificar</button>
-      <button class="btn ghost" id="out">Sair</button></div>`);
-    document.getElementById("out").onclick=async()=>{ await sb.auth.signOut(); loginScreen(); };
-    document.getElementById("v").onclick=async()=>{
-      const code=document.getElementById("code").value.trim();
-      const ch = await sb.auth.mfa.challenge({ factorId: factor.id });
-      if(ch.error){ document.getElementById("m").textContent=ch.error.message; return; }
-      const vr = await sb.auth.mfa.verify({ factorId:factor.id, challengeId:ch.data.id, code });
-      if(vr.error){ document.getElementById("m").textContent="Código inválido."; return; }
-      resolve(true); boot();
-    };
-  });
-}
-async function enrollMfa(){
-  const { data, error } = await sb.auth.mfa.enroll({ factorType:"totp" });
-  if(error){ alert(error.message); return; }
-  const qr = data.totp.qr_code; const secret = data.totp.secret; const factorId = data.id;
-  show(`<div class="card" style="max-width:460px;margin:6vh auto"><h2>Ativar segundo fator (2FA)</h2>
-    <p class="small muted">Escaneie o QR no app autenticador (Google Authenticator, Authy) e digite o código gerado.</p>
-    <div style="text-align:center">${qr}</div>
-    <p class="small">Ou use a chave: <code>${esc(secret)}</code></p>
-    <label>Código<input id="c" inputmode="numeric" placeholder="000000"></label>
-    <div id="m" class="err"></div>
-    <button class="btn primary" id="ok">Ativar</button><button class="btn ghost" id="cancel">Cancelar</button></div>`);
-  document.getElementById("cancel").onclick=()=>boot();
-  document.getElementById("ok").onclick=async()=>{
-    const code=document.getElementById("c").value.trim();
-    const ch=await sb.auth.mfa.challenge({factorId});
-    if(ch.error){document.getElementById("m").textContent=ch.error.message;return;}
-    const vr=await sb.auth.mfa.verify({factorId,challengeId:ch.data.id,code});
-    if(vr.error){document.getElementById("m").textContent="Código inválido.";return;}
-    alert("2FA ativado."); boot();
-  };
+async function doLogin(){
+  const key = document.getElementById("key").value.trim();
+  const msg = document.getElementById("msg");
+  if(!key){ msg.textContent="Informe a chave."; return; }
+  msg.textContent="Entrando...";
+  ADMIN_KEY = key;
+  const who = await adminCall("whoami");
+  if(!who.ok){ ADMIN_KEY=""; msg.textContent = who.message || "Chave inválida."; return; }
+  try { localStorage.setItem("ip_admin_key", key); } catch {}
+  render();
 }
 
 /* ---------- Dashboard ---------- */
-let ADMIN_EMAIL="";
 let TAB="lista";
 async function boot(){
-  const { data:{ session } } = await sb.auth.getSession();
-  if(!session){ loginScreen(); return; }
+  if(!ADMIN_KEY){ loginScreen(); return; }
   const who = await adminCall("whoami");
-  if(!who.ok){ await sb.auth.signOut(); loginScreen("Este e-mail não tem acesso de administrador."); return; }
-  ADMIN_EMAIL = who.email;
-  const cont = await ensureMfa();
-  if(cont!==true) return;
+  if(!who.ok){ ADMIN_KEY=""; try{localStorage.removeItem("ip_admin_key");}catch{} loginScreen(); return; }
   render();
 }
 async function render(){
   show(`<div class="topbar">
     <div><div class="brand">Jornada Extraordinária</div><h1>Painel do administrador</h1></div>
-    <div><span class="muted small">${esc(ADMIN_EMAIL)}</span>
-      <button class="btn ghost sm" id="mfa">Ativar 2FA</button>
-      <button class="btn ghost sm" id="out">Sair</button></div></div>
+    <div><button class="btn ghost sm" id="out">Sair</button></div></div>
     <div class="tabs">
       <div class="tab ${TAB==='lista'?'active':''}" data-t="lista">Respondentes</div>
       <div class="tab ${TAB==='casais'?'active':''}" data-t="casais">Casais</div>
@@ -166,8 +108,7 @@ async function render(){
       <div class="tab ${TAB==='auditoria'?'active':''}" data-t="auditoria">Auditoria</div>
     </div>
     <div id="panel"><div class="card">Carregando...</div></div>`);
-  document.getElementById("out").onclick=async()=>{ await sb.auth.signOut(); loginScreen(); };
-  document.getElementById("mfa").onclick=enrollMfa;
+  document.getElementById("out").onclick=()=>{ ADMIN_KEY=""; try{localStorage.removeItem("ip_admin_key");}catch{} loginScreen(); };
   document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{ TAB=t.dataset.t; render(); });
   if(TAB==="lista") panelList();
   else if(TAB==="casais") panelCouples();
@@ -238,10 +179,7 @@ async function panelCouples(){
   const byCode={}; (r.respondentes||[]).forEach(x=>{ (byCode[x.codigo_casal]=byCode[x.codigo_casal]||[]).push(x); });
   const codes=Object.keys(byCode);
   const cards=[];
-  for(const code of codes){
-    if(byCode[code].length<2) continue;
-    cards.push(`<div class="card"><h3>Casal · ${esc(code)}</h3><div id="c_${esc(code)}" class="muted small">Carregando...</div></div>`);
-  }
+  for(const code of codes){ if(byCode[code].length<2) continue; cards.push(`<div class="card"><h3>Casal · ${esc(code)}</h3><div id="c_${esc(code)}" class="muted small">Carregando...</div></div>`); }
   document.getElementById("panel").innerHTML = cards.length?cards.join(""):`<div class="card muted">Nenhum casal com os dois respondentes ainda.</div>`;
   for(const code of codes){ if(byCode[code].length<2) continue; renderCouple(code); }
 }
@@ -285,6 +223,7 @@ async function panelPair(){
 }
 async function panelCohorts(){
   const r = await cohortCall("list");
+  if(!r.ok){ document.getElementById("panel").innerHTML=`<div class="card err">${esc(r.message||r.error||'Erro ao carregar turmas.')}</div>`; return; }
   const rows = (r.cohorts||[]).map(c=>`<tr>
     <td>${esc(c.nome)}</td>
     <td><span class="chip">${esc(c.invite_code)}</span></td>
@@ -293,7 +232,7 @@ async function panelCohorts(){
     <td><button class="btn sm ghost" data-cid="${c.id}" data-act="${c.ativo?'off':'on'}">${c.ativo?'Desativar':'Ativar'}</button></td></tr>`).join("");
   document.getElementById("panel").innerHTML = `<div class="card">
     <h2>Turmas e códigos de convite</h2>
-    <p class="muted small">Cada turma tem um código que os participantes informam no cadastro. Desative para encerrar novos cadastros de uma turma.</p>
+    <p class="muted small">Cada turma tem um código que os participantes informam ao iniciar. Desative para encerrar novos cadastros.</p>
     <label>Nome da nova turma<input id="newcohort" placeholder="Ex.: Turma Março 2026"></label>
     <div id="cohort_err" class="err"></div>
     <button class="btn primary sm" id="addcohort">Criar turma</button>
@@ -306,9 +245,7 @@ async function panelCohorts(){
     if(!g.ok){ document.getElementById("cohort_err").textContent=g.detail||g.error; return; }
     panelCohorts();
   };
-  document.querySelectorAll("[data-cid]").forEach(b=>b.onclick=async()=>{
-    await cohortCall("toggle",{id:b.dataset.cid, ativo:b.dataset.act==='on'}); panelCohorts();
-  });
+  document.querySelectorAll("[data-cid]").forEach(b=>b.onclick=async()=>{ await cohortCall("toggle",{id:b.dataset.cid, ativo:b.dataset.act==='on'}); panelCohorts(); });
 }
 async function panelAudit(){
   const r = await adminCall("audit");
