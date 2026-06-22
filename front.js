@@ -45,9 +45,17 @@ function screenWelcome() {
       <p class="sub">Baseado no Myers-Briggs Type Indicator</p>
       <p>Suas respostas ajudam a entender como você prefere ver as coisas e tomar decisões. Não há respostas certas ou erradas. Conhecer suas preferências e as do seu cônjuge ajuda a entender pontos fortes e como vocês se complementam.</p>
       <p class="muted">São 93 questões rápidas, em 4 partes. Menos de 10 minutos.</p>
-      <button class="btn primary" onclick="screenInviteGate()">Começar</button>
-      <button class="btn ghost" onclick="screenLogin()">Já tenho um código de acesso</button>
-      ${saved ? `<p class="muted small">Encontramos um código salvo neste dispositivo. <a href="#" onclick="resumeSaved();return false">Retomar</a></p>` : ""}
+      <div class="path">
+        <h3 class="pathh">É a sua primeira vez?</h3>
+        <p class="small muted">Para começar, você vai precisar do <b>código de convite da sua turma</b>, entregue pela equipe da Jornada.</p>
+        <button class="btn primary" onclick="screenInviteGate()">Começar</button>
+      </div>
+      <div class="path">
+        <h3 class="pathh">Já fez o teste?</h3>
+        <p class="small muted">Use o seu <b>código pessoal</b> (o que você recebeu ao terminar) para voltar e ver o seu resumo e o do seu cônjuge.</p>
+        <button class="btn ghost" onclick="screenLogin()">Entrar com o código pessoal</button>
+      </div>
+      ${saved ? `<p class="muted small">Encontramos um código pessoal salvo neste dispositivo. <a href="#" onclick="resumeSaved();return false">Retomar de onde parei</a></p>` : ""}
     </section>`);
 }
 async function resumeSaved() {
@@ -60,10 +68,10 @@ async function resumeSaved() {
 function screenInviteGate() {
   show(`
     <section class="card">
-      <div class="brand">Acesso por turma</div>
-      <h2>Código de convite</h2>
-      <p>Informe o código de convite fornecido pela equipe da Jornada à sua turma. Ele é necessário para iniciar o questionário.</p>
-      <label>Código de convite
+      <div class="brand">Primeira vez · acesso por turma</div>
+      <h2>Código de convite da turma</h2>
+      <p>Informe o código de convite que a equipe da Jornada entregou à sua turma. Ele libera o início do questionário. Não é o mesmo que o código pessoal, que você recebe só ao terminar.</p>
+      <label>Código de convite da turma
         <input id="g_invite" placeholder="Ex.: JORNADA-XXXXX" style="text-transform:uppercase">
       </label>
       <div id="gate_err" class="err"></div>
@@ -96,10 +104,8 @@ function screenRegister() {
       <label>Gênero <span class="req">obrigatório</span>
         <select id="f_genero">
           <option value="">Selecione...</option>
-          <option value="feminino">Feminino</option>
           <option value="masculino">Masculino</option>
-          <option value="outro">Outro</option>
-          <option value="prefiro_nao_informar">Prefiro não informar</option>
+          <option value="feminino">Feminino</option>
         </select>
         <small>Usado apenas como critério de desempate no eixo Pensamento/Sentimento e para ajustar a linguagem do relatório.</small>
       </label>
@@ -141,10 +147,10 @@ async function doRegister() {
 function screenCode(code) {
   show(`
     <section class="card">
-      <div class="brand">Guarde seu código</div>
-      <h2>Seu código de acesso</h2>
+      <div class="brand">Guarde o seu código pessoal</div>
+      <h2>Seu código pessoal</h2>
       <div class="codebox">${esc(code)}</div>
-      <p>Anote este código. É com ele que você retorna depois para ver o seu resumo e o do seu cônjuge. Ele é pessoal e não deve ser compartilhado.</p>
+      <p>Anote este código pessoal. É com ele que você volta depois para ver o seu resumo e o do seu cônjuge. Ele é só seu e não deve ser compartilhado. Não confunda com o código de convite da turma, que serve apenas para entrar na primeira vez.</p>
       <button class="btn primary" onclick="startQuestionnaire()">Iniciar questionário</button>
     </section>`);
 }
@@ -153,8 +159,9 @@ function screenCode(code) {
 function screenLogin() {
   show(`
     <section class="card">
-      <h2>Entrar com seu código</h2>
-      <label>Código de acesso
+      <h2>Entrar com o código pessoal</h2>
+      <p class="small muted">É o código que você recebeu ao terminar o questionário, não o código de convite da turma.</p>
+      <label>Código pessoal
         <input id="f_login" placeholder="Ex.: 6UA8C-EFPTW" style="text-transform:uppercase">
       </label>
       <div id="login_err" class="err"></div>
