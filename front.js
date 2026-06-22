@@ -101,6 +101,10 @@ function screenRegister() {
       <label>Seu nome
         <input id="f_nome" placeholder="Seu nome completo">
       </label>
+      <label>Seu e-mail <span class="req">obrigatório</span>
+        <input id="f_email" type="email" placeholder="email@exemplo.com" autocomplete="email">
+        <small>Usamos o e-mail só para você recuperar o seu código pessoal, caso o esqueça. Não é compartilhado.</small>
+      </label>
       <label>Gênero <span class="req">obrigatório</span>
         <select id="f_genero">
           <option value="">Selecione...</option>
@@ -129,6 +133,7 @@ function screenRegister() {
 }
 async function doRegister() {
   const nome = document.getElementById("f_nome").value.trim();
+  const email = document.getElementById("f_email").value.trim();
   const genero = document.getElementById("f_genero").value;
   const conjuge_nome = document.getElementById("f_conj").value.trim();
   const codigo_casal = document.getElementById("f_cod").value.trim();
@@ -136,10 +141,11 @@ async function doRegister() {
   const consent = document.getElementById("f_consent").checked;
   const err = document.getElementById("reg_err");
   if (!nome || !genero || !codigo_casal) { err.textContent = "Preencha nome, gênero e código do casal."; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "Informe um e-mail válido para recuperar o código depois."; return; }
   if (!invite_code) { screenInviteGate(); return; }
   if (!consent) { err.textContent = "Sem a autorização não é possível gerar as informações necessárias."; return; }
   err.textContent = "Enviando...";
-  const { data } = await api("register", { nome, genero, conjuge_nome, codigo_casal, consent, invite_code });
+  const { data } = await api("register", { nome, email, genero, conjuge_nome, codigo_casal, consent, invite_code });
   if (!data.ok) { err.textContent = mapErr(data); return; }
   access_code = data.access_code; saveCode(access_code);
   screenCode(access_code);
@@ -167,6 +173,36 @@ function screenLogin() {
       <div id="login_err" class="err"></div>
       <button class="btn primary" onclick="doLogin()">Entrar</button>
       <button class="btn ghost" onclick="screenWelcome()">Voltar</button>
+      <p class="muted small">Esqueceu o código pessoal? <a href="#" onclick="screenRecover();return false">Recuperar por e-mail</a></p>
+    </section>`);
+}
+
+/* ---------- Recuperação de código por e-mail ---------- */
+function screenRecover() {
+  show(`
+    <section class="card">
+      <h2>Recuperar o código pessoal</h2>
+      <p>Informe o e-mail que você usou no cadastro. Vamos gerar um novo código pessoal e enviar para esse e-mail. Por segurança, o código anterior deixa de funcionar.</p>
+      <label>Seu e-mail
+        <input id="f_recover" type="email" placeholder="email@exemplo.com" autocomplete="email">
+      </label>
+      <div id="rec_err" class="err"></div>
+      <button class="btn primary" onclick="doRecover()">Enviar novo código</button>
+      <button class="btn ghost" onclick="screenLogin()">Voltar</button>
+    </section>`);
+}
+async function doRecover() {
+  const email = document.getElementById("f_recover").value.trim();
+  const err = document.getElementById("rec_err");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "Informe um e-mail válido."; return; }
+  err.textContent = "Enviando...";
+  const { data } = await api("recover", { email });
+  if (data.error === "muitas_tentativas") { err.textContent = "Muitas tentativas. Aguarde alguns minutos."; return; }
+  show(`
+    <section class="card">
+      <h2>Verifique o seu e-mail</h2>
+      <p>Se houver um cadastro com o e-mail <b>${esc(email)}</b>, enviamos um novo código pessoal para essa caixa de entrada. Pode levar alguns minutos; confira também o spam.</p>
+      <button class="btn primary" onclick="screenLogin()">Voltar para entrar</button>
     </section>`);
 }
 async function doLogin() {
