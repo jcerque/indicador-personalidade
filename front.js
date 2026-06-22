@@ -52,10 +52,10 @@ function screenWelcome() {
       </div>
       <div class="path">
         <h3 class="pathh">Já fez o teste?</h3>
-        <p class="small muted">Use o seu <b>código pessoal</b> (o que você recebeu ao terminar) para voltar e ver o seu resumo e o do seu cônjuge.</p>
-        <button class="btn ghost" onclick="screenLogin()">Entrar com o código pessoal</button>
+        <p class="small muted">Use a sua <b>chave de acesso pessoal</b> (a que você recebeu ao terminar) para voltar e ver o seu resumo e o do seu cônjuge.</p>
+        <button class="btn ghost" onclick="screenLogin()">Entrar com a chave de acesso pessoal</button>
       </div>
-      ${saved ? `<p class="muted small">Encontramos um código pessoal salvo neste dispositivo. <a href="#" onclick="resumeSaved();return false">Retomar de onde parei</a></p>` : ""}
+      ${saved ? `<p class="muted small">Encontramos uma chave de acesso pessoal salva neste dispositivo. <a href="#" onclick="resumeSaved();return false">Retomar de onde parei</a></p>` : ""}
     </section>`);
 }
 async function resumeSaved() {
@@ -70,7 +70,7 @@ function screenInviteGate() {
     <section class="card">
       <div class="brand">Primeira vez · acesso por turma</div>
       <h2>Código de convite da turma</h2>
-      <p>Informe o código de convite que a equipe da Jornada entregou à sua turma. Ele libera o início do questionário. Não é o mesmo que o código pessoal, que você recebe só ao terminar.</p>
+      <p>Informe o código de convite que a equipe da Jornada entregou à sua turma. Ele libera o início do questionário. Não é o mesmo que a chave de acesso pessoal, que você recebe só ao terminar.</p>
       <label>Código de convite da turma
         <input id="g_invite" placeholder="Ex.: JORNADA-XXXXX" style="text-transform:uppercase">
       </label>
@@ -103,7 +103,7 @@ function screenRegister() {
       </label>
       <label>Seu e-mail <span class="req">obrigatório</span>
         <input id="f_email" type="email" placeholder="email@exemplo.com" autocomplete="email">
-        <small>Usamos o e-mail só para você recuperar o seu código pessoal, caso o esqueça. Não é compartilhado.</small>
+        <small>Usamos o e-mail só para você recuperar a sua chave de acesso pessoal, caso a esqueça. Não é compartilhado.</small>
       </label>
       <label>Gênero <span class="req">obrigatório</span>
         <select id="f_genero">
@@ -153,10 +153,10 @@ async function doRegister() {
 function screenCode(code) {
   show(`
     <section class="card">
-      <div class="brand">Guarde o seu código pessoal</div>
-      <h2>Seu código pessoal</h2>
+      <div class="brand">Guarde a sua chave de acesso pessoal</div>
+      <h2>Sua chave de acesso pessoal</h2>
       <div class="codebox">${esc(code)}</div>
-      <p>Anote este código pessoal. É com ele que você volta depois para ver o seu resumo e o do seu cônjuge. Ele é só seu e não deve ser compartilhado. Não confunda com o código de convite da turma, que serve apenas para entrar na primeira vez.</p>
+      <p>Anote esta chave de acesso pessoal. É com ela que você volta depois para ver o seu resumo e o do seu cônjuge. Ela é só sua e não deve ser compartilhada. Não confunda com o código de convite da turma, que serve apenas para entrar na primeira vez.</p>
       <button class="btn primary" onclick="startQuestionnaire()">Iniciar questionário</button>
     </section>`);
 }
@@ -165,15 +165,15 @@ function screenCode(code) {
 function screenLogin() {
   show(`
     <section class="card">
-      <h2>Entrar com o código pessoal</h2>
-      <p class="small muted">É o código que você recebeu ao terminar o questionário, não o código de convite da turma.</p>
-      <label>Código pessoal
+      <h2>Entrar com a chave de acesso pessoal</h2>
+      <p class="small muted">É a chave que você recebeu ao terminar o questionário, não o código de convite da turma.</p>
+      <label>Chave de acesso pessoal
         <input id="f_login" placeholder="Ex.: 6UA8C-EFPTW" style="text-transform:uppercase">
       </label>
       <div id="login_err" class="err"></div>
       <button class="btn primary" onclick="doLogin()">Entrar</button>
       <button class="btn ghost" onclick="screenWelcome()">Voltar</button>
-      <p class="muted small">Esqueceu o código pessoal? <a href="#" onclick="screenRecover();return false">Recuperar por e-mail</a></p>
+      <p class="muted small">Esqueceu a chave de acesso pessoal? <a href="#" onclick="screenRecover();return false">Recuperar por e-mail</a></p>
     </section>`);
 }
 
@@ -181,8 +181,8 @@ function screenLogin() {
 function screenRecover() {
   show(`
     <section class="card">
-      <h2>Recuperar o código pessoal</h2>
-      <p>Informe o e-mail que você usou no cadastro. Vamos gerar um novo código pessoal e enviar para esse e-mail. Por segurança, o código anterior deixa de funcionar.</p>
+      <h2>Recuperar a chave de acesso pessoal</h2>
+      <p>Informe o e-mail que você usou no cadastro. Vamos gerar uma nova chave de acesso pessoal e enviar para esse e-mail. Por segurança, a chave anterior deixa de funcionar.</p>
       <label>Seu e-mail
         <input id="f_recover" type="email" placeholder="email@exemplo.com" autocomplete="email">
       </label>
@@ -201,14 +201,14 @@ async function doRecover() {
   show(`
     <section class="card">
       <h2>Verifique o seu e-mail</h2>
-      <p>Se houver um cadastro com o e-mail <b>${esc(email)}</b>, enviamos um novo código pessoal para essa caixa de entrada. Pode levar alguns minutos; confira também o spam.</p>
+      <p>Se houver um cadastro com o e-mail <b>${esc(email)}</b>, enviamos uma nova chave de acesso pessoal para essa caixa de entrada. Pode levar alguns minutos; confira também o spam.</p>
       <button class="btn primary" onclick="screenLogin()">Voltar para entrar</button>
     </section>`);
 }
 async function doLogin() {
   const code = document.getElementById("f_login").value.trim().toUpperCase();
   const err = document.getElementById("login_err");
-  if (!code) { err.textContent = "Informe seu código."; return; }
+  if (!code) { err.textContent = "Informe a sua chave de acesso pessoal."; return; }
   err.textContent = "Entrando...";
   const { data } = await api("login", { access_code: code });
   if (!data.ok) { err.textContent = "Código não encontrado."; return; }
