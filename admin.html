@@ -220,18 +220,19 @@ async function panelPair(){
               : n===1 ? `<span class="badge b-gerado">aguardando o par</span>`
               : `<span class="badge b-enviado">casal completo</span>`;
     const membros = g.membros.map(m=>`<tr>
-        <td>${esc(m.nome)} ${m.tipo?`<span class="chip">${esc(m.tipo)}</span>`:''}</td>
+        <td>${esc(m.nome)} ${m.tipo?`<span class="chip">${esc(m.tipo)}</span>`:''}<div class="small muted">${m.status==='concluido'?'questionário concluído':'questionário não concluído'}</div></td>
         <td class="small">${esc(m.genero)}</td>
         <td class="small">cônjuge informado: ${esc(m.conjuge_nome||'—')}</td>
-        <td><input class="small" style="width:150px;display:inline-block" id="nc_${m.id}" placeholder="novo código"></td>
-        <td><button class="btn sm gold" data-fix="${m.id}">Corrigir código</button></td>
+        <td><input class="small" style="width:140px;display:inline-block" id="nc_${m.id}" placeholder="novo código"></td>
+        <td style="white-space:nowrap"><button class="btn sm gold" data-fix="${m.id}">Corrigir código</button>
+          <button class="btn sm" style="background:#fde0e0;color:#b3261e" data-del="${m.id}" data-nm="${esc(m.nome)}">Excluir</button></td>
       </tr>`).join("");
     return `<div class="card"><h3>Código: ${esc(g.codigo)} &nbsp; ${flag}</h3>
       <table class="data"><tbody>${membros}</tbody></table></div>`;
   }).join("");
   document.getElementById("panel").innerHTML = `<div class="card">
       <h2>Códigos do casal</h2>
-      <p class="small muted">Cada bloco é um código. <b>Casal completo</b> = dois respondentes. <b>Aguardando o par</b> = só um informou esse código. <b>Código repetido</b> = mais de dois usaram o mesmo código (erro a corrigir). Para corrigir, digite o código certo na linha da pessoa e clique em Corrigir código. Para juntar um casal que digitou códigos diferentes, coloque os dois no mesmo código. Isso não altera as respostas.</p>
+      <p class="small muted">Cada bloco é um código. <b>Casal completo</b> = dois respondentes. <b>Aguardando o par</b> = só um informou esse código. <b>Código repetido</b> = mais de dois usaram o mesmo código (erro a corrigir). Para corrigir, digite o código certo na linha da pessoa e clique em Corrigir código. Para juntar um casal que digitou códigos diferentes, coloque os dois no mesmo código. Isso não altera as respostas. <b>Excluir</b> remove um cadastro duplicado (a mesma pessoa que aparece duas vezes), com a respectiva resposta e relatório, sem volta.</p>
     </div>` + (blocks||'<div class="card muted">Nenhum respondente ainda.</div>');
   document.querySelectorAll("[data-fix]").forEach(btn=>btn.onclick=async()=>{
     const id=btn.dataset.fix; const novo=(document.getElementById("nc_"+id).value||"").trim();
@@ -239,6 +240,14 @@ async function panelPair(){
     if(!confirm("Mudar o código desta pessoa para \""+novo.toUpperCase()+"\"? O pareamento será refeito por este código.")) return;
     btn.textContent="..."; const s=await fixCall("set_codigo",{id,codigo:novo});
     if(!s.ok){ alert(s.message||s.error); btn.textContent="Corrigir código"; return; }
+    panelPair();
+  });
+  document.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=async()=>{
+    const id=btn.dataset.del; const nm=btn.dataset.nm||"esta pessoa";
+    if(!confirm("EXCLUIR o cadastro de \""+nm+"\"?\n\nIsto apaga o respondente, as respostas, o resultado e o relatório dele, e o desliga do casal. Não dá para desfazer.\n\nUse só para remover cadastro duplicado.")) return;
+    if(!confirm("Confirma definitivamente a exclusão de \""+nm+"\"?")) return;
+    btn.textContent="..."; const s=await fixCall("delete_respondent",{id});
+    if(!s.ok){ alert(s.message||s.error); btn.textContent="Excluir"; return; }
     panelPair();
   });
 }
