@@ -45,6 +45,7 @@
 "use strict";
 const ADMIN_URL = CONFIG.FN_URL.replace("respondent-api","admin-api");
 const COHORTS_URL = CONFIG.FN_URL.replace("respondent-api","cohorts-api");
+const FIX_URL = CONFIG.FN_URL.replace("respondent-api","admin-fix");
 let ADMIN_KEY = ""; try { ADMIN_KEY = localStorage.getItem("ip_admin_key") || ""; } catch {}
 const app = () => document.getElementById("app");
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -58,6 +59,12 @@ async function adminCall(action, payload={}){
 }
 async function cohortCall(action, payload={}){
   const res = await fetch(COHORTS_URL, { method:"POST",
+    headers:{ "Content-Type":"application/json", "x-admin-key":ADMIN_KEY },
+    body: JSON.stringify({ action, ...payload }) });
+  return res.json();
+}
+async function fixCall(action, payload={}){
+  const res = await fetch(FIX_URL, { method:"POST",
     headers:{ "Content-Type":"application/json", "x-admin-key":ADMIN_KEY },
     body: JSON.stringify({ action, ...payload }) });
   return res.json();
@@ -204,24 +211,36 @@ async function renderCouple(code){
     showReport(g.html, ()=>render()); };
 }
 async function panelPair(){
-  const r = await adminCall("list");
-  const opts = (r.respondentes||[]).map(x=>`<option value="${x.id}">${esc(x.nome)} (${esc(x.codigo_casal)})</option>`).join("");
-  document.getElementById("panel").innerHTML=`<div class="card">
-    <h2>Corrigir emparelhamento</h2>
-    <p class="small muted">Defina manualmente quem forma o casal de um código. Não altera respostas.</p>
-    <label>Código do casal<input id="pcode" placeholder="Ex.: JR21121985"></label>
-    <label>Cônjuge A<select id="pa"><option value="">—</option>${opts}</select></label>
-    <label>Cônjuge B<select id="pb"><option value="">—</option>${opts}</select></label>
-    <div id="pm" class="err"></div>
-    <button class="btn primary" id="pset">Salvar emparelhamento</button></div>`;
-  document.getElementById("pset").onclick=async()=>{
-    const codigo=document.getElementById("pcode").value.trim();
-    const a=document.getElementById("pa").value, b=document.getElementById("pb").value;
-    if(!codigo){ document.getElementById("pm").textContent="Informe o código."; return; }
-    const s=await adminCall("pair",{codigo,respondent_a:a,respondent_b:b});
-    document.getElementById("pm").className=s.ok?"ok":"err";
-    document.getElementById("pm").textContent=s.ok?"Emparelhamento salvo.":(s.message||s.error);
-  };
+  const o = await fixCall("codes_overview");
+  if(!o.ok){ document.getElementById("panel").innerHTML=`<div class="card err">${esc(o.message||o.error||'Erro ao carregar.')}</div>`; return; }
+  const grupos = o.grupos||[];
+  const blocks = grupos.map(g=>{
+    const n=g.n;
+    const flag = n>=3 ? `<span class="badge" style="background:#fde0e0;color:#b3261e">código repetido (${n})</span>`
+              : n===1 ? `<span class="badge b-gerado">aguardando o par</span>`
+              : `<span class="badge b-enviado">casal completo</span>`;
+    const membros = g.membros.map(m=>`<tr>
+        <td>${esc(m.nome)} ${m.tipo?`<span class="chip">${esc(m.tipo)}</span>`:''}</td>
+        <td class="small">${esc(m.genero)}</td>
+        <td class="small">cônjuge informado: ${esc(m.conjuge_nome||'—')}</td>
+        <td><input class="small" style="width:150px;display:inline-block" id="nc_${m.id}" placeholder="novo código"></td>
+        <td><button class="btn sm gold" data-fix="${m.id}">Corrigir código</button></td>
+      </tr>`).join("");
+    return `<div class="card"><h3>Código: ${esc(g.codigo)} &nbsp; ${flag}</h3>
+      <table class="data"><tbody>${membros}</tbody></table></div>`;
+  }).join("");
+  document.getElementById("panel").innerHTML = `<div class="card">
+      <h2>Códigos do casal</h2>
+      <p class="small muted">Cada bloco é um código. <b>Casal completo</b> = dois respondentes. <b>Aguardando o par</b> = só um informou esse código. <b>Código repetido</b> = mais de dois usaram o mesmo código (erro a corrigir). Para corrigir, digite o código certo na linha da pessoa e clique em Corrigir código. Para juntar um casal que digitou códigos diferentes, coloque os dois no mesmo código. Isso não altera as respostas.</p>
+    </div>` + (blocks||'<div class="card muted">Nenhum respondente ainda.</div>');
+  document.querySelectorAll("[data-fix]").forEach(btn=>btn.onclick=async()=>{
+    const id=btn.dataset.fix; const novo=(document.getElementById("nc_"+id).value||"").trim();
+    if(!novo){ alert("Digite o novo código para essa pessoa."); return; }
+    if(!confirm("Mudar o código desta pessoa para \""+novo.toUpperCase()+"\"? O pareamento será refeito por este código.")) return;
+    btn.textContent="..."; const s=await fixCall("set_codigo",{id,codigo:novo});
+    if(!s.ok){ alert(s.message||s.error); btn.textContent="Corrigir código"; return; }
+    panelPair();
+  });
 }
 async function panelCohorts(){
   const r = await cohortCall("list");
